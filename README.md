@@ -1,0 +1,27 @@
+# Docs
+
+https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/index.html#introduction
+
+# Environment
+
+To activate the ESP-IDF environment via CLI:
+
+```sh
+source ~/.espressif/tools/activate_idf_v6.1.sh
+```
+
+# Connection
+Connect a data-capable USB-C cable to the COM connector of the board.
+
+The serial port will be something like /dev/ttyUSB0
+
+# Flashing
+
+```sh
+idf.py set-target esp32s3
+idf.py build
+idf.py -p PORT flash
+idf.py -p PORT monitor
+
+`flash` runs `build` implicitly. You can also combine the `flash` and `monitor` commands into one command line statement.
+```
