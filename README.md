@@ -10,6 +10,10 @@ To activate the ESP-IDF environment via CLI:
 source ~/.espressif/tools/activate_idf_v6.1.sh
 ```
 
+## VSCode
+
+To get code completion and navigation run "ESP-IDF: Add VS Code Configuration Files" once in the root of the project.
+
 # Connection
 Connect a data-capable USB-C cable to the COM connector of the board.
 
@@ -19,6 +23,7 @@ The serial port will be something like /dev/ttyUSB0
 
 ```sh
 idf.py set-target esp32s3
+idf.py menuconfig # (for project configuration like wifi settings)
 idf.py build
 idf.py -p PORT flash
 idf.py -p PORT monitor
