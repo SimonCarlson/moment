@@ -1,4 +1,10 @@
 {
     "cmake.sourceDirectory": "/home/rzmd/repos/moment/station",
-    "idf.currentSetup": "/home/rzmd/.espressif/v6.1/esp-idf"
+    "idf.currentSetup": "/home/rzmd/.espressif/v6.1/esp-idf",
+    "clangd.path": "/home/rzmd/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",
+    "clangd.arguments": [
+      "--background-index",
+      "--query-driver=**",
+      "--compile-commands-dir=/home/rzmd/repos/moment/build"
+    ]
 }
