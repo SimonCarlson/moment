@@ -14,6 +14,8 @@ source ~/.espressif/tools/activate_idf_v6.1.sh
 
 To get code completion and navigation run "ESP-IDF: Add VS Code Configuration Files" once in the root of the project.
 
+Open VsCode from moment/station for include paths to resolve correctly.
+
 # Connection
 Connect a data-capable USB-C cable to the COM connector of the board.
 

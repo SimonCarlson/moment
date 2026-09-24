@@ -145,6 +145,10 @@ void wifi_init_sta(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    /* Disable WiFi power save for low-latency WireGuard traffic.
+     * ESP-IDF defaults to WIFI_PS_MIN_MODEM which adds up to one DTIM
+     * interval (100-300ms) of delay per packet wake cycle. */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
