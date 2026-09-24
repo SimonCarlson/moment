@@ -1,0 +1,22 @@
+dependencies:
+  idf:
+    version: '>=6.0,<7.0'
+description: WireGuard for lwIP, ESP-IDF port. Fork of smartalock/wireguard-lwip (BSD-3-Clause,
+  Daniel Hope / floorsense.nz) maintained by FuGo — DERP relay + magicsock callbacks,
+  ESP-IDF 6.x/GCC 15 compat, 16-peer support. Bundled with fugo101/microlink.
+files:
+  exclude:
+  - src/crypto/cortex/**/*
+  - example/**/*
+issues: https://github.com/fugo101/wireguard-lwip/issues
+license: BSD-3-Clause
+repository: git://github.com/fugo101/wireguard-lwip.git
+repository_info:
+  commit_sha: cdd476ef297a64063579d977434d98340017a58d
+  path: .
+tags:
+- wireguard
+- lwip
+- vpn
+url: https://github.com/fugo101/wireguard-lwip
+version: 1.0.3
