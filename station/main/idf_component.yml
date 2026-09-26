@@ -1,11 +1,13 @@
 dependencies:
   espressif/esp_wifi_remote:
-    version: ">=0.10,<2.0"
+    version: '>=0.10,<2.0'
     rules:
-      - if: "target in [esp32p4, esp32h2]"
+    - if: target in [esp32p4, esp32h2]
   espressif/esp_hosted:
-    version: "~2"
+    version: ~2
     rules:
-      - if: "target in [esp32p4, esp32h2]"
+    - if: target in [esp32p4, esp32h2]
   fugo101/microlink:
-    version: "^3.0.0"
+    version: ^3.0.0
+  debsahu/espidf-nats: ^1.4.0
+  espressif/esp_websocket_client: '*'

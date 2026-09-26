@@ -1,0 +1,16 @@
+dependencies:
+  espressif/cjson:
+    public: true
+    rules:
+    - if: idf_version >= 6.0.0
+    version: '>=1.7.18'
+  espressif/esp_websocket_client: '>=1.0.0'
+  idf: '>=4.4'
+description: ESP-IDF NATS client header-only library
+license: MIT
+repository: git://github.com/debsahu/espidf-nats.git
+repository_info:
+  commit_sha: 73b7118003a5d16b4e2e0e7ccb242bfb3a1bd966
+  path: .
+url: https://github.com/debsahu/espidf-nats
+version: 1.4.0

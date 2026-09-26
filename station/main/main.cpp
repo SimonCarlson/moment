@@ -1,10 +1,15 @@
+extern "C"
+{
 #include <wifi.h>
+}
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 
 #include "microlink.h"
 #include "microlink_internal.h"
+
+#include "espidf_nats.h"
 
 const char *TAG = "wifi station";
 
@@ -15,7 +20,7 @@ static microlink_udp_socket_t *udp_sock = NULL;
 
 void vpn_init();
 
-void app_main(void)
+extern "C" void app_main(void)
 {
     /* Initialize RNG */
     psa_crypto_init();
@@ -33,7 +38,7 @@ void app_main(void)
     {
         /* If you only want to open more logs in the wifi module, you need to make the max level greater than the default level,
          * and call esp_log_level_set() before esp_wifi_init() to improve the log level of the wifi module. */
-        esp_log_level_set("wifi", CONFIG_LOG_MAXIMUM_LEVEL);
+        esp_log_level_set("wifi", ESP_LOG_INFO);
     }
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
@@ -113,16 +118,16 @@ static void on_udp_rx(microlink_udp_socket_t *sock, uint32_t src_ip, uint16_t sr
 
 void vpn_init()
 {
-    microlink_config_t config = {
-        .auth_key = CONFIG_ML_TAILSCALE_AUTH_KEY,
-        .device_name = CONFIG_ML_DEVICE_NAME,
-        .enable_derp = true,
-        .enable_stun = true,
-        .enable_disco = true,
-        .max_peers = CONFIG_ML_MAX_PEERS,
-        .wifi_tx_power_dbm = 13, /* Reduced for thermal management */
-    };
-    ml = microlink_init(&config);
+    microlink_config_t config = {};
+    config.auth_key = CONFIG_ML_TAILSCALE_AUTH_KEY,
+    config.device_name = CONFIG_ML_DEVICE_NAME,
+    config.enable_derp = true,
+    config.enable_stun = true,
+    config.enable_disco = true,
+    config.max_peers = CONFIG_ML_MAX_PEERS,
+    config.wifi_tx_power_dbm = 13, /* Reduced for thermal management */
+
+        ml = microlink_init(&config);
     if (!ml)
     {
         ESP_LOGE(TAG, "Failed to initialize MicroLink");

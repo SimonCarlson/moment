@@ -1,4 +1,24 @@
 dependencies:
+  debsahu/espidf-nats:
+    component_hash: 4af088f8dcfa912e22ca1112f62410482fa90be7eb9d2e88b6b80d22cf6201ca
+    dependencies:
+    - name: espressif/cjson
+      registry_url: https://components.espressif.com
+      require: public
+      rules:
+      - if: idf_version >= 6.0.0
+      version: '>=1.7.18'
+    - name: espressif/esp_websocket_client
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0.0'
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.4.0
   espressif/cjson:
     component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
     dependencies:
@@ -9,6 +29,16 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 1.7.19~2
+  espressif/esp_websocket_client:
+    component_hash: dc00233af846f3a744ada283a300e0d586040aadc3ee67361645ecdce4523672
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.8.0
   fugo101/microlink:
     component_hash: 8f977f3fd6424794c92e478132caa810678157d89c4efd09d65f9b28f4742446
     dependencies:
@@ -42,7 +72,9 @@ dependencies:
       type: idf
     version: 6.1.0
 direct_dependencies:
+- debsahu/espidf-nats
+- espressif/esp_websocket_client
 - fugo101/microlink
-manifest_hash: 333106c734df48d8bfcfd4092ab5231a686abc9d73902ffd2239e953968b1609
+manifest_hash: 56590f263430bf894caab44d4a63c803d3106d16caefe3deadbc25958e65cd62
 target: esp32s3
 version: 3.0.0
