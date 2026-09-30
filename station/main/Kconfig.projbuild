@@ -1,4 +1,20 @@
-menu "Example Configuration"
+menu "Moment - Configuration"
+
+    config NATS_SERVER
+        string "NATS server (ip or hostname)"
+        default ""
+
+    config NATS_PORT
+        int "NATS port"
+        default 4222
+
+    config NATS_USER
+        string "NATS user"
+        default ""
+    
+    config NATS_PASS
+        string "NATS password"
+        default ""
 
     config ESP_WIFI_SSID
         string "WiFi SSID"
