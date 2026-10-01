@@ -1,12 +1,12 @@
 # Moment
 A project to play with ESP32. End goal is to connect an ESP32 to an e-ink screen and embed it into a photo frame. Pulls images from NATS object storage over Tailscale.
 
-[x] Connect to wifi
-[x] Connect to Tailscale
-[?] Connect to NATS (working but unreliable)
-[ ] Pull objects from NATS
-[ ] Write images to e-ink screen
-[ ] Report status back over NATS
+- [x] Connect to wifi
+- [x] Connect to Tailscale
+- [x] Connect to NATS (working but unreliable)
+- [ ] Pull objects from NATS
+- [ ] Write images to e-ink screen
+- [ ] Report status back over NATS
 
 ## ESP Docs
 
