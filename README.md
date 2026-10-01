@@ -7,6 +7,7 @@ A project to play with ESP32. End goal is to connect an ESP32 to an e-ink screen
 - [ ] Pull objects from NATS
 - [ ] Write images to e-ink screen
 - [ ] Report status back over NATS
+- [ ] Low-power sleep through TPL5110 component
 
 ## ESP Docs
 
