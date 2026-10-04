@@ -1,4 +1,4 @@
-idf_component_register(SRCS "wifi.c" "main.cpp" "vpn.c"
+idf_component_register(SRCS "nats.cpp" "wifi.c" "main.cpp" "vpn.c" "nats.cpp"
                     PRIV_REQUIRES esp_wifi nvs_flash
                     INCLUDE_DIRS ".")
 

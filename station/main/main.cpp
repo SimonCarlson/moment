@@ -3,56 +3,23 @@ extern "C"
 #include <wifi.h>
 #include <vpn.h>
 }
+#include <nats.h>
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "lwip/netif.h"
 #include "lwip/ip_addr.h"
+#include "psa/crypto.h"
 
 #include "microlink.h"
-
-#include "espidf_nats.h"
 
 const char *TAG = "wifi station";
 
 // Handle to tailscale configured netif
 static struct netif *ts_lwip_netif = NULL;
 
-#define NATS_SERVER "100.76.38.123"
-// #define NATS_SERVER CONFIG_NATS_SERVER
-#define NATS_PORT CONFIG_NATS_PORT
-#define NATS_USER CONFIG_NATS_USER
-#define NATS_PASS CONFIG_NATS_PASS
-
 microlink_t *ml = NULL;
-static NATS *nats = NULL;
-
-void nats_init()
-{
-    nats = new NATS(NATS_SERVER, NATS_PORT, NATS_USER, NATS_PASS);
-    if (nats == NULL)
-    {
-        ESP_LOGE(TAG, "Failed to create NATS client");
-        return;
-    }
-
-    nats->on_connect = []()
-    { ESP_LOGI(TAG, "Connected to NATS"); };
-    nats->on_disconnect = []()
-    { ESP_LOGW(TAG, "Disconnected from NATS"); };
-    nats->on_error = []()
-    { ESP_LOGE(TAG, "️NATS error: %s", nats->last_error_string()); };
-
-    ESP_LOGI(TAG, "Connecting to NATS server %s:%d", NATS_SERVER, NATS_PORT);
-    // For some reason it seems like every other connection attempt succeeds. Don't know why
-    // TODO: Should at least wrap this in some retries
-    if (!nats->connect())
-    {
-        ESP_LOGE(TAG, "Failed to connect to NATS server: %s", nats->last_error_string());
-        return;
-    }
-}
 
 extern "C" void app_main(void)
 {
