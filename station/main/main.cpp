@@ -92,6 +92,8 @@ extern "C" void app_main(void)
     }
 }
 
+// Needed to provide Tailscale routing for destination hosts on that subnet
+// Microlink doesn't register routes to the standard netif
 extern "C" struct netif *ts_ip4_route_src_hook(const ip4_addr_t *src, const ip4_addr_t *dest)
 {
     if (ts_lwip_netif == NULL)
