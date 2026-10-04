@@ -49,8 +49,20 @@ extern "C" void app_main(void)
     wifi_init_sta();
 
     vpn_init();
-
+    ESP_LOGI(TAG, "Waiting for Microlink to connect");
+    while (!microlink_is_connected(ml))
+    {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+    ESP_LOGI(TAG, "Microlink has connected");
     ts_lwip_netif = (netif *)microlink_get_netif_impl(ml);
+
+    ESP_LOGI(TAG, "Waiting for TS NETIF to come UP");
+    while (ts_lwip_netif == NULL || !netif_is_up(ts_lwip_netif) || !netif_is_link_up(ts_lwip_netif))
+    {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+    ESP_LOGI(TAG, "TS NETIF is UP");
 
     nats_init();
     while (1)
@@ -63,26 +75,34 @@ extern "C" void app_main(void)
 // Microlink doesn't register routes to the standard netif
 extern "C" struct netif *ts_ip4_route_src_hook(const ip4_addr_t *src, const ip4_addr_t *dest)
 {
-    if (ts_lwip_netif == NULL)
-    {
-        return NULL;
-    }
-
     // Tailscale uses CGNAT 100.64.0.0/10
-    // 100.64.0.0 -> 0x64400000
-    // 255.192.0.0 -> 0xFFC000000
+    // 100.64.0.0  -> 0x64400000
+    // 255.192.0.0 -> 0xFFC00000
     uint32_t ts_network = PP_HTONL(0x64400000);
     uint32_t ts_mask = PP_HTONL(0xFFC00000);
 
-    // Return the tailscale netif if dest matches the tailscale subnet
-    if ((dest->addr & ts_mask) == (ts_network & ts_mask))
+    // Irrelevant address
+    if ((dest->addr & ts_mask) != (ts_network & ts_mask))
     {
-        char ip_str[16];
-        microlink_ip_to_str(dest->addr, ip_str);
-        ESP_LOGI(TAG, "Returning tailscale netif for %s", ip_str);
-        return ts_lwip_netif;
+        return NULL;
+    }
+    if (ts_lwip_netif == NULL)
+    {
+        ESP_LOGW(TAG, "HOOK: Triggered but netif is null");
+        return NULL;
     }
 
-    // Fall back to the default netif otherwise
-    return NULL;
+    // Return the tailscale netif if dest matches the tailscale subnet
+    if (!netif_is_up(ts_lwip_netif))
+    {
+        ESP_LOGW(TAG, "HOOK: Triggered but netif is down");
+        return NULL;
+    }
+    if (!netif_is_link_up(ts_lwip_netif))
+    {
+        ESP_LOGW(TAG, "HOOK: Triggered but link is down");
+        return NULL;
+    }
+
+    return ts_lwip_netif;
 }
