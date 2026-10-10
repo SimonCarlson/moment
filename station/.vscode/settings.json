@@ -1,4 +1,11 @@
 {
+  "C_Cpp.formatting": "disabled",
+  "[c]": {
+    "editor.formatOnSave": false
+  },
+  "[cpp]": {
+    "editor.formatOnSave": false
+  },
   "idf.currentSetup": "/home/rzmd/.espressif/v6.1/esp-idf",
   "idf.customExtraVars": {},
   "clangd.path": "/home/rzmd/.espressif/tools/esp-clangd/esp-21.1.3_20260408/esp-clangd/bin/clangd",

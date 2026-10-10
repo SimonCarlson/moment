@@ -21,6 +21,8 @@ static struct netif *ts_lwip_netif = NULL;
 
 microlink_t *ml = NULL;
 
+#define LOCAL_DEBUG 1
+
 extern "C" void app_main(void)
 {
     /* Initialize RNG */
@@ -49,22 +51,27 @@ extern "C" void app_main(void)
     wifi_init_sta();
 
     vpn_init();
+#ifndef LOCAL_DEBUG
     ESP_LOGI(TAG, "Waiting for Microlink to connect");
     while (!microlink_is_connected(ml))
     {
         vTaskDelay(pdMS_TO_TICKS(200));
     }
+#endif
     ESP_LOGI(TAG, "Microlink has connected");
     ts_lwip_netif = (netif *)microlink_get_netif_impl(ml);
 
+#ifndef LOCAL_DEBUG
     ESP_LOGI(TAG, "Waiting for TS NETIF to come UP");
     while (ts_lwip_netif == NULL || !netif_is_up(ts_lwip_netif) || !netif_is_link_up(ts_lwip_netif))
     {
         vTaskDelay(pdMS_TO_TICKS(200));
     }
     ESP_LOGI(TAG, "TS NETIF is UP");
+#endif
 
     nats_init();
+    char *nuid = nats_check_for_message();
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));
