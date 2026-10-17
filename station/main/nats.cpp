@@ -15,8 +15,9 @@ static NATS *nats = NULL;
 #define NATS_USER CONFIG_NATS_USER
 #define NATS_PASS CONFIG_NATS_PASS
 
-#define OBJ_DONE_BIT (1 << 0)
-#define NOTIF_DONE_BIT (1 << 1)
+#define NOTIF_DONE_BIT (1 << 0)
+#define OBJ_NUID_BIT (1 << 1)
+#define OBJ_FETCH_BIT (1 << 2)
 
 static EventGroupHandle_t nats_event_group = NULL;
 // static bool obj_fetch_success = false;
@@ -49,8 +50,9 @@ void nats_init()
     {
         nats_event_group = xEventGroupCreate();
     }
-    xEventGroupClearBits(nats_event_group, OBJ_DONE_BIT);
     xEventGroupClearBits(nats_event_group, NOTIF_DONE_BIT);
+    xEventGroupClearBits(nats_event_group, OBJ_NUID_BIT);
+    xEventGroupClearBits(nats_event_group, OBJ_FETCH_BIT);
 }
 
 // TODO: Put in config
@@ -58,31 +60,31 @@ void nats_init()
 // #define NATS_NOTIF_SUBJECT CONFIG_NATS_NOTIF_SUBJECT
 
 static char *nuid = NULL;
-char *nats_check_for_message()
+bool nats_check_for_message()
 {
     if (nats == NULL)
     {
-        return nuid;
+        return false;
     }
 
     nats->jetstream_pull("MOMENT_NOTIF", "parents", 1,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Got NATS NOTIF msg size=%d %.*s", msg.size, msg.size, msg.data);
-            cJSON* msg_json = cJSON_Parse(msg.data);
-            cJSON* nuid_item = cJSON_GetObjectItem(msg_json, "nuid");
+            cJSON *msg_json = cJSON_Parse(msg.data);
+            cJSON *nuid_item = cJSON_GetObjectItem(msg_json, "nuid");
             if (cJSON_IsString(nuid_item) && nuid_item->valuestring != NULL)
             {
-                nuid = nuid_item->valuestring;
-                ESP_LOGI(TAG, "NUID: %s", nuid);
+                nuid = strdup(nuid_item->valuestring);
+                ESP_LOGI(TAG, "NUID: %s size=%d", nuid, strlen(nuid));
             }
             cJSON_Delete(msg_json);
             ESP_LOGI(TAG, "Message reply=%s subject=%s", msg.reply, msg.subject);
-            if (msg.reply != NULL && msg.reply[0] != '\0')
-            {
-                nats->jetstream_ack(msg.reply);
-                ESP_LOGI(TAG, "Acked message on reply %s", msg.reply);
-            }
+            // if (msg.reply != NULL && msg.reply[0] != '\0')
+            // {
+            //     nats->jetstream_ack(msg.reply);
+            //     ESP_LOGI(TAG, "Acked message on reply %s", msg.reply);
+            // }
             xEventGroupSetBits(nats_event_group, NOTIF_DONE_BIT);
         }
     );
@@ -95,19 +97,19 @@ char *nats_check_for_message()
         nats->process();
         vTaskDelay(pdMS_TO_TICKS(10));
 
-        // if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
-        // {
-        //     ESP_LOGE(TAG, "Hard timeout waiting for notif message");
-        //     break;
-        // }
+        if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
+        {
+            ESP_LOGE(TAG, "Hard timeout waiting for notif message");
+            break;
+        }
     }
 
-    return nuid;
+    return nuid != NULL;
 }
 
 struct MomentNotification
 {
-    char nuid[128];
+    char *nuid;
     size_t size;
     uint8_t chunks;
 };
@@ -123,40 +125,108 @@ struct MomentDownload
 
 };
 
+// TODO: Put in config
+#define NATS_OBJ_BUCKET "MOMENT"
+
+static MomentNotification notif;
 bool nats_object_get()
 {
-//     if (nats == NULL)
-//     {
-//         return false;
-//     }
+    if (nats == NULL || nuid == NULL)
+    {
+        return false;
+    }
 
-//     ESP_LOGI(TAG, "GETTING NATS OBJECT");
-//     // TODO: Must get the object metadata name in notification
-//     char *subject = "";
-//     nats->subscribe(subject,
-//         [](nats_msg_t msg)
-//         {
+    ESP_LOGI(TAG, "Getting NATS OBJ for nuid %.*s size=%d", strlen(nuid), nuid, strlen(nuid));
 
-//         }
-//     );
 
-//             obj_fetch_success = false;
-//             xEventGroupSetBits(obj_event_group, OBJ_DONE_BIT);
+    // TODO: Maybe move this part into notif function since it is metadata and not data chunks
+    nats->obj_get_info(NATS_OBJ_BUCKET, nuid,
+        [](nats_msg_t msg){
+            ESP_LOGI(TAG, "Got NATS OBJ msg size=%d %.*s", msg.size, msg.size, msg.data);
+            cJSON *msg_json = cJSON_Parse(msg.data);
+            cJSON *msg_message_item = cJSON_GetObjectItem(msg_json, "message");
+            cJSON *msg_data_item = cJSON_GetObjectItem(msg_message_item, "data");
+            if (cJSON_IsString(msg_data_item) && msg_data_item->valuestring != NULL)
+            {
+                char *msg_data;
+                size_t dlen;
+                mbedtls_base64_decode((unsigned char*)msg_data, 512, &dlen, (unsigned char*)msg_data_item->valuestring, strlen(msg_data_item->valuestring));
+                ESP_LOGI(TAG, "DECODED BASE64 %.*s", msg_data);
+                cJSON *data_json = cJSON_Parse(msg_data);
+                cJSON *data_options_item = cJSON_GetObjectItem(data_json, "options");
 
-//     TickType_t start_tick = xTaskGetTickCount();
-//     const TickType_t timeout_ticks = pdMS_TO_TICKS(6000);
+                cJSON *data_options_chunk = cJSON_GetObjectItem(data_options_item, "chunks");
+                if (cJSON_IsNumber(data_options_chunk) && data_options_chunk->valueint > 0)
+                {
+                    notif.chunks = data_options_chunk->valueint;
+                }
+                cJSON *data_options_size = cJSON_GetObjectItem(data_options_item, "size");
+                if (cJSON_IsNumber(data_options_size) && data_options_size->valueint > 0)
+                {
+                    notif.size = data_options_size->valueint;
+                }
+                cJSON *data_options_nuid = cJSON_GetObjectItem(data_options_item, "nuid");
+                if (cJSON_IsString(data_options_nuid) && data_options_nuid->valuestring != NULL)
+                {
+                    notif.nuid = strdup(data_options_nuid->valuestring);
+                }
 
-//     while ((xEventGroupGetBits(obj_event_group) & OBJ_DONE_BIT) == 0)
-//     {
-//         nats->process();
-//         vTaskDelay(pdMS_TO_TICKS(10));
+                cJSON_Delete(data_json);
+                cJSON_Delete(data_options_item);
+                cJSON_Delete(data_options_chunk);
+                cJSON_Delete(data_options_size);
+                cJSON_Delete(data_options_nuid);
 
-//         if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
-//         {
-//             ESP_LOGE(TAG, "Hard timeout waiting for NATS response");
-//             break;
-//         }
-//     }
+
+            }
+            ESP_LOGI(TAG, "MSG: %*.s", strlen(msg_json->valuestring), msg_json->valuestring);
+
+            cJSON_Delete(msg_json);
+            cJSON_Delete(msg_message_item);
+            cJSON_Delete(msg_data_item);
+            xEventGroupSetBits(nats_event_group, OBJ_NUID_BIT);
+        }
+    );
+
+    TickType_t start_tick = xTaskGetTickCount();
+    const TickType_t timeout_ticks = pdMS_TO_TICKS(6000);
+
+    while ((xEventGroupGetBits(nats_event_group) & OBJ_NUID_BIT) == 0)
+    {
+        nats->process();
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
+        {
+            ESP_LOGE(TAG, "Hard timeout waiting for NATS response");
+            break;
+        }
+    }
+
+    if (obj_nuid == NULL)
+    {
+        return false;
+    }
+
+    char subject[1024];
+    snprintf(subject, sizeof(subject), "$0.%s.C.%s", NATS_OBJ_BUCKET, obj_nuid);
+    nats->subscribe(subject,
+        [](nats_msg_t msg){
+            xEventGroupSetBits(nats_event_group, OBJ_FETCH_BIT);
+        }
+    );
+
+    while ((xEventGroupGetBits(nats_event_group) & OBJ_FETCH_BIT) == 0)
+    {
+        nats->process();
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        if ((xTaskGetTickCount() - start_tick) > timeout_ticks)
+        {
+            ESP_LOGE(TAG, "Hard timeout waiting for NATS response");
+            break;
+        }
+    }
 
 //     // TODO: Handle 404 on object
 //     ESP_LOGI(TAG, "obj_ret %d", obj_ret);

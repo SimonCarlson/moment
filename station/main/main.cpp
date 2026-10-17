@@ -71,7 +71,8 @@ extern "C" void app_main(void)
 #endif
 
     nats_init();
-    char *nuid = nats_check_for_message();
+    nats_check_for_message();
+    nats_object_get();
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));
