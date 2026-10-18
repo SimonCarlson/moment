@@ -72,7 +72,8 @@ extern "C" void app_main(void)
 
     nats_init();
     nats_check_for_message();
-    nats_object_get();
+    MomentDownload download;
+    nats_object_get(&download);
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));

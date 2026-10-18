@@ -100,34 +100,18 @@ bool nats_check_for_message()
     return nuid != NULL;
 }
 
-struct MomentNotification
-{
-    char *nuid;
-    size_t size;
-    uint8_t chunks;
-};
-
-struct MomentDownload
-{
-    uint8_t *buffer = nullptr;
-    size_t size = 0;
-    size_t received = 0;
-    uint8_t expected_chunks = 0;
-    uint8_t received_chunks = 0;
-    bool error = false;
-};
-
 // TODO: Put in config
 #define NATS_OBJ_BUCKET "MOMENT"
 
 static MomentNotification notif;
-static MomentDownload download;
-bool nats_object_get()
+static MomentDownload *active_download = NULL;
+bool nats_object_get(MomentDownload *download)
 {
     if (nats == NULL || nuid == NULL)
     {
         return false;
     }
+    active_download = download;
 
     ESP_LOGI(TAG, "Getting NATS OBJ for nuid %.*s size=%d", strlen(nuid), nuid, strlen(nuid));
 
@@ -232,29 +216,27 @@ bool nats_object_get()
 
     process_nats_call(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
 
-    download = MomentDownload{
-        .buffer = (uint8_t*)heap_caps_malloc(notif.size, MALLOC_CAP_SPIRAM),
-        .size = notif.size,
-        .received = 0,
-        .expected_chunks = notif.chunks,
-        .received_chunks = 0,
-        .error = false,
-    };
+    active_download->buffer = (uint8_t*)heap_caps_malloc(notif.size, MALLOC_CAP_SPIRAM);
+    active_download->size = notif.size;
+    active_download->received = 0;
+    active_download->expected_chunks = notif.chunks;
+    active_download->received_chunks = 0;
+    active_download->error = false;
     nats->jetstream_pull("OBJ_MOMENT", consumer_name, notif.chunks,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Got chunk subject=%s size=%d", msg.subject, msg.size);
-            if (msg.size + download.received <= download.size && download.received_chunks < download.expected_chunks)
+            if (msg.size + active_download->received <= active_download->size && active_download->received_chunks < active_download->expected_chunks)
             {
-                memcpy(&download.buffer[download.received], msg.data, msg.size);
-                download.received += msg.size;
-                download.received_chunks++;
+                memcpy(&active_download->buffer[active_download->received], msg.data, msg.size);
+                active_download->received += msg.size;
+                active_download->received_chunks++;
                 // if (msg.reply != NULL && msg.reply[0] != '\0')
                 // {
                 //     nats->jetstream_ack(msg.reply);
                 //     ESP_LOGI(TAG, "Acked message on reply %s", msg.reply);
                 // }
-                if (download.received_chunks == download.expected_chunks && download.received == download.size)
+                if (active_download->received_chunks == active_download->expected_chunks && active_download->received == active_download->size)
                 {
                     xEventGroupSetBits(nats_event_group, OBJ_FETCH_BIT);
                 }
