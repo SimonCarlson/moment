@@ -20,6 +20,8 @@ static NATS *nats = NULL;
 #define NOTIF_DONE_BIT (1 << 0)
 #define OBJ_NUID_BIT (1 << 1)
 #define OBJ_FETCH_BIT (1 << 2)
+#define OBJ_CONSUMER_CREATE_BIT (1 << 3)
+#define OBJ_CONSUMER_DELETE_BIT (1 << 4)
 
 static EventGroupHandle_t nats_event_group = NULL;
 // static bool obj_fetch_success = false;
@@ -55,6 +57,8 @@ void nats_init()
     xEventGroupClearBits(nats_event_group, NOTIF_DONE_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_NUID_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_FETCH_BIT);
+    xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
+    xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
 }
 
 // TODO: Put in config
@@ -189,12 +193,23 @@ bool nats_object_get()
         return false;
     }
 
+
     char subject[1024];
-    snprintf(subject, sizeof(subject), "$0.%s.C.%s", NATS_OBJ_BUCKET, notif.nuid);
+    snprintf(subject, sizeof(subject), "$O.%s.C.%s", NATS_OBJ_BUCKET, notif.nuid);
     char consumer_name[32];
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
     snprintf(consumer_name, sizeof(consumer_name), "esp32_%02x%02x%02x", mac[3], mac[4], mac[5]);
+
+    nats->jetstream_consumer_delete("OBJ_MOMENT", consumer_name,
+        [](nats_msg_t msg)
+        {
+            ESP_LOGI(TAG, "Consumer deleted");
+            xEventGroupSetBits(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
+        }
+    );
+
+    process_nats_call(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
 
     jetstream_consumer_config_t consumer_config{
         .stream_name = "OBJ_MOMENT",
@@ -211,10 +226,11 @@ bool nats_object_get()
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Consumer created");
+            xEventGroupSetBits(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
         }
     );
 
-    // TODO: Process request and wait for consumer to be created
+    process_nats_call(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
 
     download = MomentDownload{
         .buffer = (uint8_t*)heap_caps_malloc(notif.size, MALLOC_CAP_SPIRAM),
@@ -227,6 +243,7 @@ bool nats_object_get()
     nats->jetstream_pull("OBJ_MOMENT", consumer_name, notif.chunks,
         [](nats_msg_t msg)
         {
+            ESP_LOGI(TAG, "Got chunk subject=%s size=%d", msg.subject, msg.size);
             if (msg.size + download.received <= download.size && download.received_chunks < download.expected_chunks)
             {
                 memcpy(&download.buffer[download.received], msg.data, msg.size);
@@ -242,20 +259,24 @@ bool nats_object_get()
                     xEventGroupSetBits(nats_event_group, OBJ_FETCH_BIT);
                 }
             }
+            nats->jetstream_ack(msg.reply);
         }
     );
 
-    process_nats_call(nats_event_group, OBJ_FETCH_BIT);
+    // TODO: Should return bool and bail if false
+    process_nats_call(nats_event_group, OBJ_FETCH_BIT, 30000);
 
+    nats->jetstream_consumer_delete("OBJ_MOMENT", consumer_name,
+        [](nats_msg_t msg)
+        {
+            ESP_LOGI(TAG, "Consumer deleted");
+            xEventGroupSetBits(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
+        }
+    );
 
+    process_nats_call(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
 
-    // TODO: Delete consumer
-
-//     // TODO: Handle 404 on object
-//     ESP_LOGI(TAG, "obj_ret %d", obj_ret);
-//     ESP_LOGI(TAG, "obj_fetch_success %d", obj_fetch_success);
-//     return obj_fetch_success;
-    return false;
+    return true;
 }
 
 void process_nats_call(const EventGroupHandle_t event_group, int bit, const int timeout)
