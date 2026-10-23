@@ -41,16 +41,24 @@ bool nats_init()
     nats->on_disconnect = []()
     { ESP_LOGW(TAG, "Disconnected from NATS"); };
     nats->on_error = []()
-    { ESP_LOGE(TAG, "️NATS error: %s", nats->last_error_string()); };
+    { ESP_LOGE(TAG, "NATS error: %s", nats->last_error_string()); };
 
     ESP_LOGI(TAG, "Connecting to NATS server %s:%d", NATS_SERVER, NATS_PORT);
     // For some reason it seems like every other connection attempt succeeds. Don't know why
     // TODO: Should at least wrap this in some retries
-    if (!nats->connect())
+    const int retries = 3;
+    for (int i = 1; i <= retries; i++)
     {
-        ESP_LOGE(TAG, "Failed to connect to NATS server: %s", nats->last_error_string());
-        return false;
+        if (!nats->connect())
+        {
+            ESP_LOGE(TAG, "Failed to connect to NATS server: %s, attempt %d/%d", nats->last_error_string(), i, retries);
+            if (i == retries)
+            {
+                return false;
+            }
+        }
     }
+
     if (nats_event_group == NULL)
     {
         nats_event_group = xEventGroupCreate();
