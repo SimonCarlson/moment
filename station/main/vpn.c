@@ -28,6 +28,7 @@ static void on_state_change(microlink_t *ml_handle, microlink_state_t state, voi
 // TODO: Put in config
 #define NATS_HOST_DNS "home.kudu-puffin.ts.net"
 static uint32_t nats_peer_ip = 0;
+// TODO: Not sure this is needed? I think it's a leftover from not passing tailscale netif in ipv4 hook. The server address should be static behind tailscale
 static void on_peer_update(microlink_t *ml_handle, const microlink_peer_info_t *peer,
                            void *user_data)
 {
