@@ -23,11 +23,11 @@ static NATS *nats = NULL;
 #define NATS_OBJ_BUCKET CONFIG_NATS_OBJ_BUCKET
 #define NATS_OBJ_STREAM "OBJ_" NATS_OBJ_BUCKET
 
-#define NOTIF_DONE_BIT (1 << 0)
-#define OBJ_NUID_BIT (1 << 1)
-#define OBJ_FETCH_BIT (1 << 2)
-#define OBJ_CONSUMER_CREATE_BIT (1 << 3)
-#define OBJ_CONSUMER_DELETE_BIT (1 << 4)
+#define NOTIF_DONE_BIT BIT0
+#define OBJ_NUID_BIT BIT1
+#define OBJ_FETCH_BIT BIT2
+#define OBJ_CONSUMER_CREATE_BIT BIT3
+#define OBJ_CONSUMER_DELETE_BIT BIT4
 
 static EventGroupHandle_t nats_event_group = NULL;
 
