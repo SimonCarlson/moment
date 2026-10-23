@@ -23,8 +23,8 @@ static NATS *nats = NULL;
 #define NATS_OBJ_BUCKET CONFIG_NATS_OBJ_BUCKET
 #define NATS_OBJ_STREAM "OBJ_" NATS_OBJ_BUCKET
 
-#define NOTIF_DONE_BIT BIT0
-#define OBJ_NUID_BIT BIT1
+#define NOTIF_GET_BIT BIT0
+#define OBJ_NUID_GET_BIT BIT1
 #define OBJ_FETCH_BIT BIT2
 #define OBJ_CONSUMER_CREATE_BIT BIT3
 #define OBJ_CONSUMER_DELETE_BIT BIT4
@@ -48,8 +48,6 @@ bool nats_init()
     { ESP_LOGE(TAG, "NATS error: %s", nats->last_error_string()); };
 
     ESP_LOGI(TAG, "Connecting to NATS server %s:%d", NATS_SERVER, NATS_PORT);
-    // For some reason it seems like every other connection attempt succeeds. Don't know why
-    // TODO: Should at least wrap this in some retries
     const int retries = 3;
     for (int i = 1; i <= retries; i++)
     {
@@ -67,8 +65,8 @@ bool nats_init()
     {
         nats_event_group = xEventGroupCreate();
     }
-    xEventGroupClearBits(nats_event_group, NOTIF_DONE_BIT);
-    xEventGroupClearBits(nats_event_group, OBJ_NUID_BIT);
+    xEventGroupClearBits(nats_event_group, NOTIF_GET_BIT);
+    xEventGroupClearBits(nats_event_group, OBJ_NUID_GET_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_FETCH_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
@@ -78,7 +76,7 @@ bool nats_init()
 
 
 static char *nuid = NULL;
-bool nats_check_for_message()
+bool nats_check_for_notification()
 {
     if (nats == NULL)
     {
@@ -104,30 +102,27 @@ bool nats_check_for_message()
             //     nats->jetstream_ack(msg.reply);
             //     ESP_LOGI(TAG, "Acked message on reply %s", msg.reply);
             // }
-            xEventGroupSetBits(nats_event_group, NOTIF_DONE_BIT);
+            xEventGroupSetBits(nats_event_group, NOTIF_GET_BIT);
         }
     );
 
-    process_nats_call(nats_event_group, NOTIF_DONE_BIT);
+    process_nats_call(nats_event_group, NOTIF_GET_BIT);
 
-    return nuid != NULL;
-}
-
-
-static MomentNotification notif;
-static MomentDownload *active_download = NULL;
-bool nats_object_get(MomentDownload *download)
-{
-    if (nats == NULL || nuid == NULL)
+    if (nuid == NULL)
     {
         return false;
     }
-    active_download = download;
+    return nats_get_notification();
+}
 
-    ESP_LOGI(TAG, "Getting NATS OBJ for nuid %.*s size=%d", strlen(nuid), nuid, strlen(nuid));
+static MomentNotification notif;
+bool nats_get_notification()
+{
+    if (nats == NULL)
+    {
+        return false;
+    }
 
-
-    // TODO: Maybe move this part into notif function since it is metadata and not data chunks
     nats->obj_get_info(NATS_OBJ_BUCKET, nuid,
         [](nats_msg_t msg){
             ESP_LOGI(TAG, "Got NATS OBJ msg size=%d %.*s", msg.size, msg.size, msg.data);
@@ -137,22 +132,24 @@ bool nats_object_get(MomentDownload *download)
             cJSON *msg_data_item = cJSON_GetObjectItem(msg_message_item, "data");
             if (cJSON_IsString(msg_data_item) && msg_data_item->valuestring != NULL)
             {
-                ESP_LOGI(TAG, "Data to decode: %.*s", strlen(msg_data_item->valuestring), msg_data_item->valuestring);
+                char *obj_msg = msg_data_item->valuestring;
+                int msg_len = strlen(obj_msg);
+                ESP_LOGI(TAG, "Data to decode: %.*s", msg_len, obj_msg);
                 size_t expected_len;
-                mbedtls_base64_decode(NULL, 0, &expected_len, (unsigned char*)msg_data_item->valuestring, strlen(msg_data_item->valuestring));
+                mbedtls_base64_decode(NULL, 0, &expected_len, (unsigned char*)obj_msg, msg_len);
 
                 char *dst = (char*)malloc(expected_len+1);
                 size_t written_len = 0;
-                int decode_ret = mbedtls_base64_decode((unsigned char*)dst, expected_len, &written_len, (unsigned char*)msg_data_item->valuestring, strlen(msg_data_item->valuestring));
+                int decode_ret = mbedtls_base64_decode((unsigned char*)dst, expected_len, &written_len, (unsigned char*)obj_msg, msg_len);
                 if (decode_ret != 0)
                 {
-                    // TODO: Handle failed decoding
+                    // TODO: Report back failed decoding
+                    return;
                 }
                 dst[written_len] = '\0';
 
                 ESP_LOGI(TAG, "decode_ret: %d", decode_ret);
                 ESP_LOGI(TAG, "DECODED BASE64 %.*s", strlen(dst), dst);
-
 
                 cJSON *data_json = cJSON_Parse(dst);
                 cJSON *data_options_chunk = cJSON_GetObjectItem(data_json, "chunks");
@@ -177,25 +174,36 @@ bool nats_object_get(MomentDownload *download)
             ESP_LOGI(TAG, "NOTIF: chunks=%d size=%d nuid=%.*s", notif.chunks, notif.size, strlen(notif.nuid), notif.nuid);
 
             cJSON_Delete(msg_json);
-            xEventGroupSetBits(nats_event_group, OBJ_NUID_BIT);
+            xEventGroupSetBits(nats_event_group, OBJ_NUID_GET_BIT);
         }
     );
 
-    process_nats_call(nats_event_group, OBJ_NUID_BIT);
+    process_nats_call(nats_event_group, OBJ_NUID_GET_BIT);
 
-    if (notif.nuid == NULL)
+    return notif.chunks > 0 && notif.size > 0 && notif.nuid != NULL;
+}
+
+
+static MomentDownload *active_download = NULL;
+bool nats_get_object(MomentDownload *download)
+{
+    if (nats == NULL || nuid == NULL)
     {
         return false;
     }
+    active_download = download;
 
-
+    ESP_LOGI(TAG, "Getting NATS OBJ for nuid %.*s size=%d", strlen(nuid), nuid, strlen(nuid));
     char subject[1024];
     snprintf(subject, sizeof(subject), "$O.%s.C.%s", NATS_OBJ_BUCKET, notif.nuid);
-    char consumer_name[32];
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
+    char consumer_name[32];
     snprintf(consumer_name, sizeof(consumer_name), "esp32_%02x%02x%02x", mac[3], mac[4], mac[5]);
 
+    // We create new consumers from the client since the subject changes dynamically (it is the base64 of the uploaded image name)
+    // Deleting a non-existing consumer is handled gracefully by the NATS client lib while
+    // trying to create an already existing consumer is not handled gracefully
     nats->jetstream_consumer_delete(NATS_OBJ_STREAM, consumer_name,
         [](nats_msg_t msg)
         {
@@ -227,9 +235,10 @@ bool nats_object_get(MomentDownload *download)
 
     process_nats_call(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
 
+    // TODO: Check the notif.size, if it's too big then bail and report an error
     active_download->buffer = (uint8_t*)heap_caps_malloc(notif.size, MALLOC_CAP_SPIRAM);
     active_download->size = notif.size;
-    active_download->received = 0;
+    active_download->received_bytes = 0;
     active_download->expected_chunks = notif.chunks;
     active_download->received_chunks = 0;
     active_download->error = false;
@@ -237,17 +246,20 @@ bool nats_object_get(MomentDownload *download)
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Got chunk subject=%s size=%d", msg.subject, msg.size);
-            if (msg.size + active_download->received <= active_download->size && active_download->received_chunks < active_download->expected_chunks)
+            if (active_download->received_bytes + msg.size <= active_download->size
+                && active_download->received_chunks < active_download->expected_chunks
+            )
             {
-                memcpy(&active_download->buffer[active_download->received], msg.data, msg.size);
-                active_download->received += msg.size;
+                memcpy(&active_download->buffer[active_download->received_bytes], msg.data, msg.size);
+                active_download->received_bytes += msg.size;
                 active_download->received_chunks++;
+                // TODO: Reinstate
                 // if (msg.reply != NULL && msg.reply[0] != '\0')
                 // {
                 //     nats->jetstream_ack(msg.reply);
                 //     ESP_LOGI(TAG, "Acked message on reply %s", msg.reply);
                 // }
-                if (active_download->received_chunks == active_download->expected_chunks && active_download->received == active_download->size)
+                if (active_download->received_chunks == active_download->expected_chunks && active_download->received_bytes == active_download->size)
                 {
                     xEventGroupSetBits(nats_event_group, OBJ_FETCH_BIT);
                 }

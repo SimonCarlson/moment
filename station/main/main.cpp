@@ -81,7 +81,7 @@ extern "C" void app_main(void)
         return;
     }
 
-    if (!nats_check_for_message())
+    if (!nats_check_for_notification())
     {
         ESP_LOGE(TAG, "No notification message, aborting");
         // TODO: Graceful shutdown
@@ -90,7 +90,7 @@ extern "C" void app_main(void)
     }
 
     MomentDownload download;
-    if (!nats_object_get(&download))
+    if (!nats_get_object(&download))
     {
         ESP_LOGE(TAG, "Could not get image, aborting");
         // TODO: Graceful shutdown
