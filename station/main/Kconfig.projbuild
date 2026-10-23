@@ -16,6 +16,18 @@ menu "Moment - Configuration"
         string "NATS password"
         default ""
 
+    config NATS_NOTIF_STREAM
+        string "NATS notification stream name"
+        default "MOMENT_NOTIF"
+
+    config NATS_NOTIF_CONSUMER
+        string "NATS notification consumer name"
+        default ""
+
+    config NATS_OBJ_BUCKET
+        string "NATS object bucket name"
+        default "MOMENT"
+
     config ESP_WIFI_SSID
         string "WiFi SSID"
         default "myssid"

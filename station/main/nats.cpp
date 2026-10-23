@@ -18,6 +18,10 @@ static NATS *nats = NULL;
 #define NATS_PORT CONFIG_NATS_PORT
 #define NATS_USER CONFIG_NATS_USER
 #define NATS_PASS CONFIG_NATS_PASS
+#define NATS_NOTIF_STREAM CONFIG_NATS_NOTIF_STREAM
+#define NATS_NOTIF_CONSUMER CONFIG_NATS_NOTIF_CONSUMER
+#define NATS_OBJ_BUCKET CONFIG_NATS_OBJ_BUCKET
+#define NATS_OBJ_STREAM "OBJ_" NATS_OBJ_BUCKET
 
 #define NOTIF_DONE_BIT (1 << 0)
 #define OBJ_NUID_BIT (1 << 1)
@@ -72,9 +76,6 @@ bool nats_init()
     return true;
 }
 
-// TODO: Put in config
-#define NATS_NOTIF_SUBJECT "EXAMPLE_NOTIF"
-// #define NATS_NOTIF_SUBJECT CONFIG_NATS_NOTIF_SUBJECT
 
 static char *nuid = NULL;
 bool nats_check_for_message()
@@ -84,7 +85,7 @@ bool nats_check_for_message()
         return false;
     }
 
-    nats->jetstream_pull("MOMENT_NOTIF", "parents", 1,
+    nats->jetstream_pull(NATS_NOTIF_STREAM, NATS_NOTIF_CONSUMER, 1,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Got NATS NOTIF msg size=%d %.*s", msg.size, msg.size, msg.data);
@@ -112,8 +113,6 @@ bool nats_check_for_message()
     return nuid != NULL;
 }
 
-// TODO: Put in config
-#define NATS_OBJ_BUCKET "MOMENT"
 
 static MomentNotification notif;
 static MomentDownload *active_download = NULL;
@@ -197,7 +196,7 @@ bool nats_object_get(MomentDownload *download)
     esp_efuse_mac_get_default(mac);
     snprintf(consumer_name, sizeof(consumer_name), "esp32_%02x%02x%02x", mac[3], mac[4], mac[5]);
 
-    nats->jetstream_consumer_delete("OBJ_MOMENT", consumer_name,
+    nats->jetstream_consumer_delete(NATS_OBJ_STREAM, consumer_name,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Consumer deleted");
@@ -208,7 +207,7 @@ bool nats_object_get(MomentDownload *download)
     process_nats_call(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
 
     jetstream_consumer_config_t consumer_config{
-        .stream_name = "OBJ_MOMENT",
+        .stream_name = NATS_OBJ_STREAM,
         .durable_name = consumer_name,
         .filter_subject = subject,
         .deliver_all = true,
@@ -234,7 +233,7 @@ bool nats_object_get(MomentDownload *download)
     active_download->expected_chunks = notif.chunks;
     active_download->received_chunks = 0;
     active_download->error = false;
-    nats->jetstream_pull("OBJ_MOMENT", consumer_name, notif.chunks,
+    nats->jetstream_pull(NATS_OBJ_STREAM, consumer_name, notif.chunks,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Got chunk subject=%s size=%d", msg.subject, msg.size);
@@ -260,7 +259,7 @@ bool nats_object_get(MomentDownload *download)
     // TODO: Should return bool and bail if false
     process_nats_call(nats_event_group, OBJ_FETCH_BIT, 30000);
 
-    nats->jetstream_consumer_delete("OBJ_MOMENT", consumer_name,
+    nats->jetstream_consumer_delete(NATS_OBJ_STREAM, consumer_name,
         [](nats_msg_t msg)
         {
             ESP_LOGI(TAG, "Consumer deleted");
