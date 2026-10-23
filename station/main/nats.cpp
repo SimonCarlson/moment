@@ -26,15 +26,14 @@ static NATS *nats = NULL;
 #define OBJ_CONSUMER_DELETE_BIT (1 << 4)
 
 static EventGroupHandle_t nats_event_group = NULL;
-// static bool obj_fetch_success = false;
 
-void nats_init()
+bool nats_init()
 {
     nats = new NATS(NATS_SERVER, NATS_PORT, NATS_USER, NATS_PASS);
     if (nats == NULL)
     {
         ESP_LOGE(TAG, "Failed to create NATS client");
-        return;
+        return false;
     }
 
     nats->on_connect = []()
@@ -50,7 +49,7 @@ void nats_init()
     if (!nats->connect())
     {
         ESP_LOGE(TAG, "Failed to connect to NATS server: %s", nats->last_error_string());
-        return;
+        return false;
     }
     if (nats_event_group == NULL)
     {
@@ -61,6 +60,8 @@ void nats_init()
     xEventGroupClearBits(nats_event_group, OBJ_FETCH_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_CREATE_BIT);
     xEventGroupClearBits(nats_event_group, OBJ_CONSUMER_DELETE_BIT);
+
+    return true;
 }
 
 // TODO: Put in config
@@ -88,6 +89,7 @@ bool nats_check_for_message()
             }
             cJSON_Delete(msg_json);
             ESP_LOGI(TAG, "Message reply=%s subject=%s", msg.reply, msg.subject);
+            // TODO: Reinstate
             // if (msg.reply != NULL && msg.reply[0] != '\0')
             // {
             //     nats->jetstream_ack(msg.reply);

@@ -42,7 +42,7 @@ static void on_peer_update(microlink_t *ml_handle, const microlink_peer_info_t *
     }
 }
 
-void vpn_init()
+bool vpn_init(microlink_t *ml)
 {
     microlink_config_t config = {};
     config.auth_key = CONFIG_ML_TAILSCALE_AUTH_KEY,
@@ -53,20 +53,19 @@ void vpn_init()
     config.max_peers = CONFIG_ML_MAX_PEERS,
     config.wifi_tx_power_dbm = 13, /* Reduced for thermal management */
 
-        ml = microlink_init(&config);
+    ml = microlink_init(&config);
     if (!ml)
     {
         ESP_LOGE(TAG, "Failed to initialize MicroLink");
-        return;
+        return false;
     }
     microlink_set_state_callback(ml, on_state_change, NULL);
     microlink_set_peer_callback(ml, on_peer_update, NULL);
 
-    /* Start connecting */
     ESP_ERROR_CHECK(microlink_start(ml));
-    /* Wait for CONNECTED state before creating UDP socket */
     while (!microlink_is_connected(ml))
     {
         vTaskDelay(pdMS_TO_TICKS(500));
     }
+    return true;
 }

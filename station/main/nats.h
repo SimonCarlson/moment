@@ -18,7 +18,7 @@ struct MomentDownload
     bool error = false;
 };
 
-void nats_init();
+bool nats_init();
 void process_nats_call(const EventGroupHandle_t event_group, int bit, const int timeout = 5000);
 bool nats_check_for_message();
 bool nats_object_get(MomentDownload *download);

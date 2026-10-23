@@ -25,7 +25,7 @@ microlink_t *ml = NULL;
 
 extern "C" void app_main(void)
 {
-    /* Initialize RNG */
+    // Initialize RNG
     psa_crypto_init();
 
     // Initialize NVS
@@ -37,20 +37,24 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    // if (CONFIG_LOG_MAXIMUM_LEVEL > CONFIG_LOG_DEFAULT_LEVEL)
-    // {
-    /* If you only want to open more logs in the wifi module, you need to make the max level greater than the default level,
-     * and call esp_log_level_set() before esp_wifi_init() to improve the log level of the wifi module. */
-    esp_log_level_set("wifi", ESP_LOG_WARN);
-    esp_log_level_set("ml_wg_mgr", ESP_LOG_WARN);
-    esp_log_level_set("ml_net_io", ESP_LOG_WARN);
-    esp_log_level_set("ml_derp", ESP_LOG_WARN);
-    // }
+    // esp_log_level_set("wifi", ESP_LOG_WARN);
+    // esp_log_level_set("ml_wg_mgr", ESP_LOG_WARN);
+    // esp_log_level_set("ml_net_io", ESP_LOG_WARN);
+    // esp_log_level_set("ml_derp", ESP_LOG_WARN);
 
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    wifi_init_sta();
+    if (!wifi_init_sta())
+    {
+        ESP_LOGE(TAG, "Failed to connect to wifi, aborting");
+        // TODO: Graceful shutdown
+        return;
+    }
 
-    vpn_init();
+    if (!vpn_init(ml))
+    {
+        ESP_LOGE(TAG, "Failed to connect to wifi, aborting");
+        // TODO: Graceful shutdown
+        return;
+    }
 #ifndef LOCAL_DEBUG
     ESP_LOGI(TAG, "Waiting for Microlink to connect");
     while (!microlink_is_connected(ml))
@@ -70,10 +74,33 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "TS NETIF is UP");
 #endif
 
-    nats_init();
-    nats_check_for_message();
+    if (!nats_init())
+    {
+        ESP_LOGE(TAG, "Failed to connect to NATS, aborting");
+        // TODO: Graceful shutdown
+        return;
+    }
+
+    if (!nats_check_for_message())
+    {
+        ESP_LOGE(TAG, "No notification message, aborting");
+        // TODO: Graceful shutdown
+        // TODO: Report back
+        return;
+    }
+
     MomentDownload download;
-    nats_object_get(&download);
+    if (!nats_object_get(&download))
+    {
+        ESP_LOGE(TAG, "Could not get image, aborting");
+        // TODO: Graceful shutdown
+        // TODO: Report back
+        return;
+    }
+
+    // TODO: Write to screen
+    // TODO: Report back
+    // TODO: Graceful shutdown
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(1000));
