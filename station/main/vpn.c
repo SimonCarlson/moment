@@ -4,6 +4,8 @@
 #include "microlink_internal.h"
 #include "esp_log.h"
 
+static const char *TAG = "moment_vpn";
+
 static void on_state_change(microlink_t *ml_handle, microlink_state_t state, void *user_data)
 {
     const char *state_names[] = {

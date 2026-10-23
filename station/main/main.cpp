@@ -14,7 +14,7 @@ extern "C"
 
 #include "microlink.h"
 
-const char *TAG = "wifi station";
+static const char *TAG = "moment";
 
 // Handle to tailscale configured netif
 static struct netif *ts_lwip_netif = NULL;

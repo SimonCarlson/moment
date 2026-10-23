@@ -1,8 +1,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
-extern const char *TAG;
-
 struct MomentNotification
 {
     char *nuid;

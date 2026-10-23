@@ -8,6 +8,8 @@
 #include "esp_mac.h"
 #include "esp_heap_caps.h"
 
+static const char *TAG = "moment_nats";
+
 static NATS *nats = NULL;
 
 // #define NATS_SERVER "100.76.38.123"
